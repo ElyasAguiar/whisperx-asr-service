@@ -1,0 +1,55 @@
+# WhisperX ASR API Service Dockerfile
+# Based on NVIDIA CUDA for GPU support
+
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+
+# Prevent interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set working directory
+WORKDIR /workspace
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    python3-dev \
+    ffmpeg \
+    git \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN python3 -m pip install --no-cache-dir --upgrade pip
+
+# Install PyTorch with CUDA support
+RUN pip3 install --no-cache-dir \
+    torch==2.0.1 \
+    torchaudio==2.0.2 \
+    --index-url https://download.pytorch.org/whl/cu118
+
+# Install WhisperX and dependencies
+RUN pip3 install --no-cache-dir git+https://github.com/m-bain/whisperx.git
+
+# Install API dependencies
+RUN pip3 install --no-cache-dir \
+    fastapi==0.104.1 \
+    uvicorn[standard]==0.24.0 \
+    python-multipart==0.0.6 \
+    pydantic==2.5.0
+
+# Create cache directory
+RUN mkdir -p /.cache && chmod 777 /.cache
+
+# Copy application code
+COPY app /workspace/app
+
+# Expose API port
+EXPOSE 9000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import requests; requests.get('http://localhost:9000/health')" || exit 1
+
+# Run the FastAPI application
+CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]

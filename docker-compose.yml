@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  whisperx-asr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whisperx-asr-api
+    restart: unless-stopped
+
+    # GPU configuration
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    ports:
+      - "9000:9000"
+
+    environment:
+      # Device configuration
+      - DEVICE=cuda  # Use 'cuda' for GPU, 'cpu' for CPU-only
+      - COMPUTE_TYPE=float16  # float16 for GPU, int8 for CPU
+      - BATCH_SIZE=16
+
+      # Hugging Face token for speaker diarization models
+      # Get your token from https://huggingface.co/settings/tokens
+      # You must accept the user agreements for pyannote models:
+      # - https://huggingface.co/pyannote/speaker-diarization-3.1
+      # - https://huggingface.co/pyannote/segmentation-3.0
+      - HF_TOKEN=${HF_TOKEN:-}
+
+      # Cache directory for models
+      - CACHE_DIR=/.cache
+
+    volumes:
+      # Persistent cache for models (recommended)
+      - whisperx-cache:/.cache
+
+      # Optional: Mount local directory for development
+      # - ./app:/workspace/app
+
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:9000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  whisperx-cache:
+    driver: local
