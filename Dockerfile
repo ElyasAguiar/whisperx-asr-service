@@ -37,10 +37,14 @@ RUN pip3 install --no-cache-dir git+https://github.com/m-bain/whisperx.git
 # Upgrade to latest pyannote.audio for community-1 model support
 RUN pip3 install --no-cache-dir --upgrade pyannote.audio
 
-# Patch WhisperX to work with latest pyannote.audio (replace use_auth_token with token)
-RUN find /usr/local/lib/python3.10/dist-packages/whisperx -type f -name "*.py" -exec sed -i 's/use_auth_token=/token=/g' {} \; || true
-RUN find /usr/local/lib/python3.10/dist-packages/whisperx -type f -name "*.py" -exec sed -i 's/use_auth_token =/token=/g' {} \; || true
-RUN find /usr/local/lib/python3.10/dist-packages/whisperx -type f -name "*.py" -exec sed -i 's/use_auth_token,/token,/g' {} \; || true
+# Patch WhisperX to work with latest pyannote.audio (rename use_auth_token to token everywhere)
+RUN find /usr/local/lib/python3.10/dist-packages/whisperx -type f -name "*.py" -print0 | \
+    xargs -0 sed -i \
+    -e 's/token=use_auth_token/token=token/g' \
+    -e 's/use_auth_token: Optional/token: Optional/g' \
+    -e 's/use_auth_token=None/token=None/g' \
+    -e 's/, use_auth_token/, token/g' \
+    -e 's/(use_auth_token)/(token)/g' || true
 
 # Install API dependencies
 RUN pip3 install --no-cache-dir \
