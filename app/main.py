@@ -109,6 +109,7 @@ async def transcribe_audio(
     word_timestamps: bool = Form(True),
     output_format: str = Form("json"),
     model: str = Form("large-v3"),
+    num_speakers: Optional[int] = Form(None),
     min_speakers: Optional[int] = Form(None),
     max_speakers: Optional[int] = Form(None),
     enable_diarization: bool = Form(True)
@@ -124,6 +125,7 @@ async def transcribe_audio(
         word_timestamps: Return word-level timestamps
         output_format: json, text, srt, vtt, or tsv
         model: WhisperX model name (tiny, base, small, medium, large-v2, large-v3)
+        num_speakers: Exact number of speakers (if known, overrides min/max)
         min_speakers: Minimum number of speakers for diarization
         max_speakers: Maximum number of speakers for diarization
         enable_diarization: Enable speaker diarization
@@ -192,12 +194,31 @@ async def transcribe_audio(
                     device=torch.device(DEVICE)
                 )
 
+                # Prepare diarization parameters
+                diarize_params = {}
+                if num_speakers is not None:
+                    # If exact number is provided, use it (overrides min/max)
+                    diarize_params["num_speakers"] = num_speakers
+                    logger.info(f"Diarization with exact speaker count: {num_speakers}")
+                else:
+                    # Otherwise use min/max range
+                    if min_speakers is not None:
+                        diarize_params["min_speakers"] = min_speakers
+                    if max_speakers is not None:
+                        diarize_params["max_speakers"] = max_speakers
+                    logger.info(f"Diarization with speaker range: {min_speakers}-{max_speakers}")
+
                 # Run diarization
-                diarize_segments = diarize_model(
-                    audio,
-                    min_speakers=min_speakers,
-                    max_speakers=max_speakers
-                )
+                diarize_output = diarize_model(audio, **diarize_params)
+
+                # Try to access exclusive_speaker_diarization (new in community-1)
+                # This simplifies reconciliation with transcription timestamps
+                if hasattr(diarize_output, 'exclusive_speaker_diarization'):
+                    diarize_segments = diarize_output.exclusive_speaker_diarization
+                    logger.info("Using exclusive speaker diarization for better timestamp reconciliation")
+                else:
+                    # Fallback to regular diarization
+                    diarize_segments = diarize_output
 
                 # Assign speakers to words
                 result = whisperx.assign_word_speakers(diarize_segments, result)
