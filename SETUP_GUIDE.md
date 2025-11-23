@@ -59,8 +59,7 @@ This guide walks you through setting up the WhisperX ASR service for use with Sp
    - Create account: https://huggingface.co/join
    - Generate token: https://huggingface.co/settings/tokens
    - Accept agreements for:
-     - https://huggingface.co/pyannote/speaker-diarization-3.1
-     - https://huggingface.co/pyannote/segmentation-3.0
+     - https://huggingface.co/pyannote/speaker-diarization-community-1 (latest model - pyannote.audio 4.0)
 
 ---
 

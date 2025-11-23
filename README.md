@@ -74,8 +74,7 @@ Speaker diarization requires a Hugging Face token and model access:
 1. Create account at [huggingface.co](https://huggingface.co/join)
 2. Generate token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
 3. Accept user agreements for:
-   - [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
-   - [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
+   - [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) (latest model - pyannote.audio 4.0)
 
 ### 3. Configure Environment
 
