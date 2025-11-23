@@ -122,7 +122,8 @@ async def transcribe_audio(
     num_speakers: Optional[int] = Form(None),
     min_speakers: Optional[int] = Form(None),
     max_speakers: Optional[int] = Form(None),
-    enable_diarization: bool = Form(True)
+    enable_diarization: bool = Form(True),
+    return_speaker_embeddings: bool = Form(False)
 ):
     """
     Main ASR endpoint compatible with openai-whisper-asr-webservice
@@ -139,6 +140,7 @@ async def transcribe_audio(
         min_speakers: Minimum number of speakers for diarization
         max_speakers: Maximum number of speakers for diarization
         enable_diarization: Enable speaker diarization
+        return_speaker_embeddings: Return speaker embeddings (256-dimensional vectors)
     """
     temp_audio_path = None
 
@@ -213,6 +215,7 @@ async def transcribe_audio(
                 logger.warning(f"Timestamp alignment failed: {str(e)}, continuing without word-level timestamps")
 
         # Step 3: Speaker diarization (if enabled and HF token available)
+        speaker_embeddings = None
         if enable_diarization and HF_TOKEN:
             logger.info("Starting speaker diarization with pyannote community-1...")
             try:
@@ -237,17 +240,26 @@ async def transcribe_audio(
                         diarize_params["max_speakers"] = max_speakers
                     logger.info(f"Diarization with speaker range: {min_speakers}-{max_speakers}")
 
+                # Add return_embeddings parameter if requested
+                if return_speaker_embeddings:
+                    diarize_params["return_embeddings"] = True
+                    logger.info("Speaker embeddings will be returned")
+
                 # Run diarization
                 diarize_output = diarize_model(audio, **diarize_params)
 
+                # Check if embeddings were returned
+                if return_speaker_embeddings and isinstance(diarize_output, tuple):
+                    diarize_segments, speaker_embeddings = diarize_output
+                    logger.info(f"Received speaker embeddings for {len(speaker_embeddings)} speakers")
+                else:
+                    diarize_segments = diarize_output
+
                 # Try to access exclusive_speaker_diarization (new in community-1)
                 # This simplifies reconciliation with transcription timestamps
-                if hasattr(diarize_output, 'exclusive_speaker_diarization'):
-                    diarize_segments = diarize_output.exclusive_speaker_diarization
+                if hasattr(diarize_segments, 'exclusive_speaker_diarization'):
+                    diarize_segments = diarize_segments.exclusive_speaker_diarization
                     logger.info("Using exclusive speaker diarization for better timestamp reconciliation")
-                else:
-                    # Fallback to regular diarization
-                    diarize_segments = diarize_output
 
                 # Assign speakers to words
                 result = whisperx.assign_word_speakers(diarize_segments, result)
@@ -269,6 +281,12 @@ async def transcribe_audio(
                 "segments": result.get("segments", []),
                 "word_segments": result.get("word_segments", [])
             }
+
+            # Add speaker embeddings if they were requested and available
+            if return_speaker_embeddings and speaker_embeddings:
+                response_data["speaker_embeddings"] = speaker_embeddings
+                logger.info(f"Including speaker embeddings in response: {list(speaker_embeddings.keys())}")
+
             return JSONResponse(content=response_data)
 
         elif output_format == "text":
