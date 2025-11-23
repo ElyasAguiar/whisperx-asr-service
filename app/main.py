@@ -6,6 +6,7 @@ Compatible with openai-whisper-asr-webservice API endpoints
 import os
 import tempfile
 import logging
+import warnings
 from typing import Optional, List
 from pathlib import Path
 
@@ -14,6 +15,9 @@ from fastapi.responses import JSONResponse
 import whisperx
 from whisperx.diarize import DiarizationPipeline
 import torch
+
+# Suppress pyannote pooling warnings about degrees of freedom
+warnings.filterwarnings("ignore", message=".*degrees of freedom is <= 0.*")
 
 # Configure logging
 logging.basicConfig(
