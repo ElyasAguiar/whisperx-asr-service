@@ -1,7 +1,7 @@
 # WhisperX ASR API Service Dockerfile
 # Based on NVIDIA CUDA for GPU support
 
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn9-runtime-ubuntu22.04
 
 # Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -24,9 +24,9 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip
 
 # Install PyTorch with CUDA support
 RUN pip3 install --no-cache-dir \
-    torch==2.0.1 \
-    torchaudio==2.0.2 \
-    --index-url https://download.pytorch.org/whl/cu118
+    torch==2.3.0 \
+    torchaudio==2.3.0 \
+    --index-url https://download.pytorch.org/whl/cu121
 
 # Install WhisperX and dependencies
 RUN pip3 install --no-cache-dir git+https://github.com/m-bain/whisperx.git
