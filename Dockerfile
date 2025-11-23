@@ -34,6 +34,9 @@ ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local
 # Install WhisperX and dependencies
 RUN pip3 install --no-cache-dir git+https://github.com/m-bain/whisperx.git
 
+# Upgrade pyannote.audio to latest version (for community-1 model support)
+RUN pip3 install --no-cache-dir --upgrade pyannote.audio
+
 # Install API dependencies
 RUN pip3 install --no-cache-dir \
     fastapi==0.104.1 \
