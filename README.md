@@ -1,32 +1,28 @@
 # WhisperX ASR API Service
 
-A production-ready Automatic Speech Recognition (ASR) API service powered by **WhisperX**, providing high-quality transcription with **speaker diarization** and **word-level timestamps**.
+**⚠️ Alpha Version - For Self-Hosting Enthusiasts**
 
-This service provides an API compatible with `openai-whisper-asr-webservice`, making it a drop-in replacement for applications using that service, such as Speakr.
+A simple ASR API service powered by WhisperX for transcription with speaker diarization. Built for self-hosters running Speakr or similar applications.
 
-## Features
+## What This Does
 
-- ✅ **High-Quality Transcription** using OpenAI Whisper models via WhisperX
-- ✅ **Speaker Diarization** with Pyannote.audio 3.1 ("Who spoke when")
-- ✅ **Word-Level Timestamps** with phoneme-based alignment
-- ✅ **Multi-Language Support** - 90+ languages
-- ✅ **Multiple Output Formats** - JSON, SRT, VTT, TSV, plain text
-- ✅ **GPU Acceleration** for fast processing
-- ✅ **RESTful API** compatible with existing ASR services
-- ✅ **Docker Deployment** for easy scaling and portability
-- ✅ **Model Caching** for improved performance
+- Transcribes audio files using OpenAI Whisper models
+- Identifies speakers ("Who spoke when") using Pyannote.audio 4.0
+- Returns word-level timestamps
+- Supports 90+ languages
+- Outputs JSON, SRT, VTT, TSV formats
+- Runs on your own GPU hardware via Docker
 
-## Architecture
+## Limitations
 
-```
-Audio Input → WhisperX Model → Timestamp Alignment → Speaker Diarization → Formatted Output
-```
+- **Not production-grade**: Basic error handling, no authentication
+- **Single instance**: No built-in scaling or load balancing
+- **GPU required**: Needs NVIDIA GPU with 14GB+ VRAM for large models
+- **Alpha software**: Expect bugs and breaking changes
 
-**Pipeline Steps:**
-1. **Transcription**: WhisperX transcribes audio with coarse timestamps
-2. **Alignment**: Wav2Vec2 provides precise word-level timestamps
-3. **Diarization**: Pyannote.audio identifies speakers and assigns to words
-4. **Formatting**: Results formatted as JSON, SRT, VTT, or other formats
+## How It Works
+
+Audio → Whisper (transcription) → Wav2Vec2 (alignment) → Pyannote (speaker ID) → Output
 
 ## Prerequisites
 
@@ -49,17 +45,11 @@ GPU memory requirements vary by model size:
 - RAM: 16GB
 - Storage: 50GB SSD
 
-**Recommended Configuration (large-v3 with diarization):**
+**Recommended (large-v3 with diarization):**
 - GPU: NVIDIA RTX 3090 (24GB VRAM) or RTX 4090
 - CPU: 12+ cores
 - RAM: 32GB
-- Storage: 100GB NVMe SSD
-
-**Production/High-Volume (multiple instances):**
-- GPU: NVIDIA A100 (40GB/80GB), A6000 (48GB)
-- CPU: 16+ cores
-- RAM: 64GB
-- Storage: 500GB+ NVMe SSD
+- Storage: 100GB SSD
 
 ### Software Requirements
 
@@ -81,14 +71,29 @@ mkdir whisperx-asr-service && cd whisperx-asr-service
 git init
 ```
 
-### 2. Get Hugging Face Token
+### 2. Get Hugging Face Token and Model Access
 
-Speaker diarization requires a Hugging Face token and model access:
+Speaker diarization requires a Hugging Face token and model access. **You must complete ALL steps below:**
 
-1. Create account at [huggingface.co](https://huggingface.co/join)
-2. Generate token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-3. Accept user agreements for:
-   - [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) (latest model - pyannote.audio 4.0)
+#### Step 2.1: Create Hugging Face Account
+- Visit: [https://huggingface.co/join](https://huggingface.co/join)
+- Sign up with your email
+
+#### Step 2.2: Accept Model User Agreement
+- **REQUIRED:** Visit [https://huggingface.co/pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)
+- Click **"Agree and access repository"** button
+- Fill out the gated access form (Company/university and use case)
+- Wait for instant approval (usually immediate)
+
+#### Step 2.3: Generate Access Token
+- Visit: [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+- Click **"New token"**
+- Name it (e.g., "whisperx-diarization")
+- Select **"Read"** permission
+- Click **"Generate token"**
+- Copy the token (starts with `hf_...`)
+
+**⚠️ Important:** Without accepting the model agreement in Step 2.2, you will get a "403 Access Denied" error even with a valid token.
 
 ### 3. Configure Environment
 
@@ -260,7 +265,7 @@ USE_ASR_ENDPOINT=true
 ASR_BASE_URL=http://<GPU_MACHINE_IP>:9000
 ```
 
-**Security Note:** For production, use HTTPS and authentication. Consider using a reverse proxy (nginx, Traefik) with SSL certificates.
+**Note:** Replace `<GPU_MACHINE_IP>` with your GPU server's IP address. Use firewall rules to restrict access to trusted machines only.
 
 ## Configuration
 
@@ -301,43 +306,18 @@ Available Whisper models (speed vs accuracy tradeoff):
 - Use `large-v3` for best quality (requires 16GB+ VRAM)
 - Use `small` or `medium` for speed/resource constraints (8-12GB VRAM)
 
-## Deployment Options
-
-### Development (Local Machine)
+## Running the Service
 
 ```bash
+# Start in foreground (see logs)
 docker compose up
+
+# Or run in background
+docker compose up -d
+
+# View logs
+docker compose logs -f
 ```
-
-### Production (Dedicated GPU Server)
-
-```bash
-# Use production compose file
-docker compose -f docker compose.yml -f docker compose.prod.yml up -d
-```
-
-### Scaling (Multiple Workers)
-
-For high-volume deployments, run multiple instances behind a load balancer:
-
-```bash
-# Scale to 3 instances
-docker compose up -d --scale whisperx-asr=3
-```
-
-Use nginx or Traefik for load balancing.
-
-### Cloud Deployment
-
-**AWS EC2 with GPU:**
-- Instance type: `g4dn.xlarge` or better
-- AMI: Deep Learning AMI (Ubuntu)
-- Open port 9000 in security group
-
-**Google Cloud Platform:**
-- Machine type: `n1-standard-4` with Tesla T4 GPU
-- Image: Deep Learning VM Image
-- Firewall: Allow port 9000
 
 ## Monitoring and Logs
 
@@ -465,39 +445,14 @@ Tested on RTX 3080 (10GB VRAM):
 
 *With diarization enabled, add ~30% processing time*
 
-## Security Considerations
+## Security Notes
 
-### For Production Deployment:
+**This service has NO built-in authentication or security features.**
 
-1. **Use HTTPS:** Deploy behind reverse proxy with SSL
-2. **Authentication:** Add API key authentication
-3. **Rate Limiting:** Implement request rate limiting
-4. **Input Validation:** Validate file sizes and formats
-5. **Network Security:** Use firewall rules, VPN, or private networks
-6. **Secrets Management:** Use Docker secrets or vault for HF_TOKEN
-
-### Example nginx configuration:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name asr.example.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://localhost:9000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-
-        # Optional: Add API key authentication
-        if ($http_x_api_key != "your-secret-key") {
-            return 401;
-        }
-    }
-}
-```
+If exposing to a network:
+- Use firewall rules to restrict access
+- Consider putting behind a reverse proxy
+- Store HF_TOKEN securely (use `.env` file, not hardcoded)
 
 ## Maintenance
 
