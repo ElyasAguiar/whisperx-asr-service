@@ -1,16 +1,14 @@
 # WhisperX ASR API Service
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Docker Hub](https://img.shields.io/badge/docker%20hub-whisperx--asr--service-blue.svg)](https://hub.docker.com/r/learnedmachine/whisperx-asr-service)
+[![Docker Build](https://github.com/murtaza-nasir/whisperx-asr-service/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/murtaza-nasir/whisperx-asr-service/actions/workflows/docker-publish.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/learnedmachine/whisperx-asr-service)](https://hub.docker.com/r/learnedmachine/whisperx-asr-service)
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688.svg)](https://fastapi.tiangolo.com/)
 [![GPU Required](https://img.shields.io/badge/GPU-NVIDIA%20CUDA-76B900.svg)](https://developer.nvidia.com/cuda-zone)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/murtaza-nasir/whisperx-asr-service)
 
 **⚠️ Alpha Version - For Self-Hosting Enthusiasts**
 
-A simple ASR API service powered by WhisperX for transcription with speaker diarization. Built for self-hosters running Speakr or similar applications.
+A simple ASR API service powered by WhisperX for transcription with speaker diarization. Built for self-hosters running [Speakr](https://github.com/murtaza-nasir/speakr) or similar applications.
 
 ## What This Does
 
@@ -67,77 +65,110 @@ GPU memory requirements vary by model size:
 - **NVIDIA Docker Runtime** (for GPU support)
 - **Hugging Face Account** (for speaker diarization models)
 
-## Quick Start
+## Quick Start (Prebuilt Image)
 
-**Two Docker Compose Files Available:**
+Get up and running in 3 steps using the prebuilt Docker image:
 
-- **`docker-compose.yml`** - Uses prebuilt image from Docker Hub (recommended for most users)
-- **`docker-compose.dev.yml`** - Builds from source with live code mounting (for development)
+### 1. Get Hugging Face Token and Model Access
 
-### Option A: Use Prebuilt Docker Image (Recommended)
+Speaker diarization requires a Hugging Face token and model access:
 
-The easiest way to get started is using our prebuilt Docker images from Docker Hub:
+**a) Create Hugging Face Account:**
+- Visit: [https://huggingface.co/join](https://huggingface.co/join) and sign up
 
-```bash
-# Pull the latest image
-docker pull learnedmachine/whisperx-asr-service:latest
+**b) Accept Model User Agreements (ALL REQUIRED):**
 
-# Or pull a specific version
-docker pull learnedmachine/whisperx-asr-service:v0.1.1alpha
-```
+You need to accept agreements for all three models:
+1. [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) - Click "Agree and access repository"
+2. [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0) - Click "Agree and access repository"
+3. [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1) - Click "Agree and access repository"
 
-Then skip to [Step 2](#2-get-hugging-face-token-and-model-access) to configure your Hugging Face token.
-
-### Option B: Build from Source
-
-### 1. Clone or Create Repository
-
-```bash
-# Clone the repository
-git clone https://github.com/murtaza-nasir/whisperx-asr-service.git
-cd whisperx-asr-service
-
-# Or create from scratch
-mkdir whisperx-asr-service && cd whisperx-asr-service
-git init
-```
-
-### 2. Get Hugging Face Token and Model Access
-
-Speaker diarization requires a Hugging Face token and model access. **You must complete ALL steps below:**
-
-#### Step 2.1: Create Hugging Face Account
-- Visit: [https://huggingface.co/join](https://huggingface.co/join)
-- Sign up with your email
-
-#### Step 2.2: Accept Model User Agreements (ALL REQUIRED)
-You need to accept agreements for **all three models** used by the diarization pipeline:
-
-1. **Main diarization model:**
-   - Visit: [https://huggingface.co/pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)
-   - Click **"Agree and access repository"**
-
-2. **Segmentation model:**
-   - Visit: [https://huggingface.co/pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
-   - Click **"Agree and access repository"**
-
-3. **Speaker diarization 3.1 (dependency):**
-   - Visit: [https://huggingface.co/pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
-   - Click **"Agree and access repository"**
-
-Fill out the form (Company/university and use case) - approval is instant.
-
-#### Step 2.3: Generate Access Token
+**c) Generate Access Token:**
 - Visit: [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-- Click **"New token"**
-- Name it (e.g., "whisperx-diarization")
-- Select **"Read"** permission
-- Click **"Generate token"**
+- Click "New token", name it (e.g., "whisperx-diarization")
+- Select "Read" permission and generate
 - Copy the token (starts with `hf_...`)
 
-**⚠️ Important:** Without accepting the model agreement in Step 2.2, you will get a "403 Access Denied" error even with a valid token.
+⚠️ **Important:** Without accepting all model agreements, you'll get "403 Access Denied" errors.
 
-### 3. Configure Environment
+### 2. Create Configuration File
+
+Create a `.env` file with your Hugging Face token:
+
+```bash
+# Create .env file
+cat > .env << 'EOF'
+HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DEVICE=cuda
+COMPUTE_TYPE=float16
+BATCH_SIZE=16
+PRELOAD_MODEL=large-v3
+MAX_FILE_SIZE_MB=1000
+EOF
+```
+
+Replace `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` with your actual token.
+
+### 3. Run with Docker Compose (Recommended)
+
+Download the docker-compose.yml file and start the service:
+
+```bash
+# Download docker-compose.yml
+curl -O https://raw.githubusercontent.com/murtaza-nasir/whisperx-asr-service/main/docker-compose.yml
+
+# Start the service (pulls prebuilt image automatically)
+docker compose up -d
+
+# Check logs
+docker compose logs -f
+```
+
+**Or run with Docker command:**
+
+```bash
+docker run -d \
+  --name whisperx-asr-api \
+  --gpus all \
+  -p 9000:9000 \
+  -e DEVICE=cuda \
+  -e COMPUTE_TYPE=float16 \
+  -e BATCH_SIZE=16 \
+  -e HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+  -e PRELOAD_MODEL=large-v3 \
+  -v whisperx-cache:/.cache \
+  --restart unless-stopped \
+  learnedmachine/whisperx-asr-service:latest
+```
+
+The service will be available at `http://localhost:9000`
+
+### 4. Test the Service
+
+```bash
+# Health check
+curl http://localhost:9000/health
+
+# Test transcription
+curl -X POST http://localhost:9000/asr \
+  -F "audio_file=@your_audio.mp3" \
+  -F "language=en"
+```
+
+---
+
+## Build from Source (Advanced)
+
+For development or if you want to build from source:
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/murtaza-nasir/whisperx-asr-service.git
+cd whisperx-asr-service
+```
+
+### 2. Set Up Environment
 
 ```bash
 # Copy example environment file
@@ -147,49 +178,37 @@ cp .env.example .env
 nano .env
 ```
 
-Update `HF_TOKEN` in `.env`:
-```bash
-HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
+### 3. Build and Run
 
-### 4. Run the Service
-
-**Using Prebuilt Image (Recommended):**
+**Using docker-compose.dev.yml (with live code mounting):**
 
 ```bash
-# Start the service (pulls image automatically)
-docker compose up -d
-
-# Check logs
-docker compose logs -f
-```
-
-**For Development (Build from Source):**
-
-```bash
-# Build and start the service
+# Build and start
 docker compose -f docker-compose.dev.yml up -d --build
 
 # Check logs
 docker compose -f docker-compose.dev.yml logs -f
 ```
 
-The service will be available at `http://localhost:9000`
-
-**Note:** The dev compose file mounts your local `./app` directory, so code changes are reflected without rebuilding.
-
-### 5. Test the API
+**Or build manually:**
 
 ```bash
-# Health check
-curl http://localhost:9000/health
+# Build image
+docker build -t whisperx-asr-service .
 
-# Transcribe an audio file
-curl -X POST -F "audio_file=@test.mp3" \
-  -F "language=en" \
-  -F "output_format=json" \
-  http://localhost:9000/asr
+# Run container
+docker run -d \
+  --name whisperx-asr-api \
+  --gpus all \
+  -p 9000:9000 \
+  --env-file .env \
+  -v whisperx-cache:/.cache \
+  whisperx-asr-service
 ```
+
+**Note:** The `docker-compose.dev.yml` file mounts `./app` directory for live code changes without rebuilding.
+
+---
 
 ## API Documentation
 
@@ -274,7 +293,7 @@ This overrides `min_speakers` and `max_speakers` and typically provides better a
 
 #### Exclusive Speaker Diarization
 
-This service automatically uses **exclusive speaker diarization** when available from the pyannote community-1 model. This feature simplifies reconciliation between fine-grained speaker diarization timestamps and transcription timestamps, making it ideal for applications like Speakr where you need to align transcripts with speaker segments.
+This service automatically uses **exclusive speaker diarization** when available from the pyannote community-1 model. This feature simplifies reconciliation between fine-grained speaker diarization timestamps and transcription timestamps, making it ideal for applications like [Speakr](https://github.com/murtaza-nasir/speakr) where you need to align transcripts with speaker segments.
 
 **Benefits:**
 - More accurate timestamp alignment between speakers and words
@@ -283,7 +302,7 @@ This service automatically uses **exclusive speaker diarization** when available
 
 ## Integration with Speakr
 
-To use this service with Speakr instead of the default ASR endpoint:
+To use this service with [Speakr](https://github.com/murtaza-nasir/speakr) instead of the default ASR endpoint:
 
 ### If Running on the Same Machine
 
