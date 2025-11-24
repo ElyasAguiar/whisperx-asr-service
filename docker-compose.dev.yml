@@ -1,9 +1,11 @@
 services:
   whisperx-asr:
-    # Use prebuilt image from Docker Hub
-    image: learnedmachine/whisperx-asr-service:latest
+    # Build from source for development
+    build:
+      context: .
+      dockerfile: Dockerfile
 
-    container_name: whisperx-asr-api
+    container_name: whisperx-asr-api-dev
     restart: unless-stopped
 
     # GPU configuration
@@ -38,6 +40,9 @@ services:
     volumes:
       # Persistent cache for models (recommended)
       - whisperx-cache:/.cache
+
+      # Mount local app directory for live code changes during development
+      - ./app:/workspace/app
 
     healthcheck:
       test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:9000/health')"]

@@ -69,6 +69,11 @@ GPU memory requirements vary by model size:
 
 ## Quick Start
 
+**Two Docker Compose Files Available:**
+
+- **`docker-compose.yml`** - Uses prebuilt image from Docker Hub (recommended for most users)
+- **`docker-compose.dev.yml`** - Builds from source with live code mounting (for development)
+
 ### Option A: Use Prebuilt Docker Image (Recommended)
 
 The easiest way to get started is using our prebuilt Docker images from Docker Hub:
@@ -147,20 +152,31 @@ Update `HF_TOKEN` in `.env`:
 HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-### 4. Build and Run
+### 4. Run the Service
+
+**Using Prebuilt Image (Recommended):**
 
 ```bash
-# Build the Docker image
-docker compose build
-
-# Start the service
+# Start the service (pulls image automatically)
 docker compose up -d
 
 # Check logs
 docker compose logs -f
 ```
 
+**For Development (Build from Source):**
+
+```bash
+# Build and start the service
+docker compose -f docker-compose.dev.yml up -d --build
+
+# Check logs
+docker compose -f docker-compose.dev.yml logs -f
+```
+
 The service will be available at `http://localhost:9000`
+
+**Note:** The dev compose file mounts your local `./app` directory, so code changes are reflected without rebuilding.
 
 ### 5. Test the API
 
