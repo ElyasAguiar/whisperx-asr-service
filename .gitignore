@@ -54,6 +54,9 @@ cache/
 .dockerignore
 docker-compose.local.yml
 
+# Local notes
+notes.md
+
 # Temporary files
 temp/
 tmp/
