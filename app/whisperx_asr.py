@@ -134,10 +134,10 @@ class WhisperXASR(ASRInterface):
             
             # Speaker diarization if requested
             if config.enable_diarization and self.hf_token:
-                logger.info("Starting speaker diarization...")
+                logger.info(f"Starting speaker diarization with model: {config.diarization_model}")
                 try:
                     diarize_model = DiarizationPipeline(
-                        model_name="pyannote/speaker-diarization-community-1",
+                        model_name=config.diarization_model,
                         use_auth_token=self.hf_token,
                         device=torch.device(self.device)
                     )

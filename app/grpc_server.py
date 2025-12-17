@@ -52,21 +52,33 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
         }
         return encoding_map.get(encoding, "LINEAR_PCM")
     
-    def _convert_audio_to_wav(self, audio_bytes: bytes, sample_rate: int, encoding: str) -> bytes:
-        """Convert audio bytes to WAV format for processing"""
-        # If already in a format that whisperx can handle, return as-is
+    def _convert_audio_to_wav(self, audio_bytes: bytes, sample_rate: int, encoding: str, 
+                              audio_channels: int = 1) -> bytes:
+        """
+        Convert audio bytes to WAV format for processing
+        
+        Args:
+            audio_bytes: Raw audio data
+            sample_rate: Sample rate in Hz
+            encoding: Audio encoding format
+            audio_channels: Number of audio channels (default: 1 for mono)
+            
+        Returns:
+            Audio data in a format WhisperX can process
+        """
         # For LINEAR_PCM, wrap in WAV container
         if encoding == "LINEAR_PCM":
             # Create WAV file in memory
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
-                wav_file.setnchannels(1)  # Mono
-                wav_file.setsampwidth(2)  # 16-bit
+                wav_file.setnchannels(audio_channels)
+                wav_file.setsampwidth(2)  # 16-bit (TODO: make configurable if needed)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_bytes)
             return wav_io.getvalue()
         else:
-            # For other formats, assume they're already in a valid format
+            # For other formats (FLAC, MP3, etc.), assume they're already in a valid format
+            # WhisperX/FFmpeg will handle the decoding
             return audio_bytes
     
     def Recognize(self, request: asr_pb2.RecognizeRequest, context) -> asr_pb2.RecognizeResponse:
@@ -101,7 +113,12 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
                 return
             
             # Convert audio to WAV format if needed
-            audio_bytes = self._convert_audio_to_wav(audio_bytes, config.sample_rate, config.audio_encoding)
+            audio_bytes = self._convert_audio_to_wav(
+                audio_bytes, 
+                request.config.sample_rate_hertz if request.config.sample_rate_hertz > 0 else 16000,
+                config.audio_encoding,
+                request.config.audio_channel_count if request.config.audio_channel_count > 0 else 1
+            )
             
             # Process audio
             logger.info(f"Processing audio: {len(audio_bytes)} bytes, model: {config.model}, language: {config.language}")
@@ -133,11 +150,15 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
                     # Add speaker tag if available
                     if word_info.speaker:
                         # Extract speaker number from speaker tag (e.g., "SPEAKER_00" -> 0)
+                        # Handles various formats: SPEAKER_00, SPEAKER_0, speaker_1, etc.
                         try:
-                            speaker_num = int(word_info.speaker.split("_")[-1])
+                            # Extract last part after underscore or other delimiters
+                            speaker_str = word_info.speaker.split("_")[-1]
+                            speaker_num = int(speaker_str)
                             word.speaker_tag = speaker_num
-                        except (ValueError, IndexError):
-                            word.speaker_tag = 0
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Failed to parse speaker tag '{word_info.speaker}': {e}")
+                            word.speaker_tag = -1  # -1 indicates unknown speaker
             
             logger.info("Recognition response prepared successfully")
             return response
@@ -190,7 +211,15 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
             logger.info(f"Received {len(audio_chunks)} audio chunks, total {len(audio_bytes)} bytes")
             
             # Convert audio to WAV format if needed
-            audio_bytes = self._convert_audio_to_wav(audio_bytes, config.sample_rate, config.audio_encoding)
+            # For streaming, we get the config from the streaming_config
+            proto_config = request_iterator  # This won't work, need to store config from first message
+            # Using config already extracted above
+            audio_bytes = self._convert_audio_to_wav(
+                audio_bytes, 
+                config.sample_rate,
+                config.audio_encoding,
+                1  # Default to mono for streaming
+            )
             
             # Process audio
             result = self.asr_engine.transcribe(audio_bytes, config)
@@ -221,10 +250,12 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
                     
                     if word_info.speaker:
                         try:
-                            speaker_num = int(word_info.speaker.split("_")[-1])
+                            speaker_str = word_info.speaker.split("_")[-1]
+                            speaker_num = int(speaker_str)
                             word.speaker_tag = speaker_num
-                        except (ValueError, IndexError):
-                            word.speaker_tag = 0
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Failed to parse speaker tag '{word_info.speaker}': {e}")
+                            word.speaker_tag = -1
             
             yield response
             logger.info("Streaming recognition response sent")

@@ -22,6 +22,7 @@ class ASRConfig:
     initial_prompt: Optional[str] = None
     sample_rate: int = 16000
     audio_encoding: str = "LINEAR_PCM"
+    diarization_model: str = "pyannote/speaker-diarization-community-1"
 
 
 @dataclass
