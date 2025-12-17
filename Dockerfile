@@ -48,7 +48,10 @@ RUN pip3 install --no-cache-dir \
     fastapi==0.104.1 \
     uvicorn[standard]==0.24.0 \
     python-multipart==0.0.6 \
-    pydantic==2.5.0
+    pydantic==2.5.0 \
+    grpcio==1.76.0 \
+    grpcio-tools==1.76.0 \
+    protobuf==6.33.2
 
 # Pre-download NLTK data for timestamp alignment (enables offline use)
 RUN python3 -c "import nltk; nltk.download('punkt_tab', download_dir='/.cache/nltk_data')"
@@ -59,13 +62,19 @@ RUN mkdir -p /.cache && chmod 777 /.cache
 
 # Copy application code
 COPY app /workspace/app
+COPY proto /workspace/proto
+COPY scripts /workspace/scripts
 
-# Expose API port
-EXPOSE 9000
+# Generate gRPC code from proto files
+RUN chmod +x /workspace/scripts/generate_grpc.sh && \
+    /workspace/scripts/generate_grpc.sh
+
+# Expose API ports (REST and gRPC)
+EXPOSE 9000 50051
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:9000/health')" || exit 1
 
-# Run the FastAPI application
-CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]
+# Run the multi-protocol server (REST + gRPC)
+CMD ["python3", "-m", "app.server"]

@@ -20,7 +20,8 @@ services:
               capabilities: [gpu]
 
     ports:
-      - "9000:9000"
+      - "9000:9000"    # REST API
+      - "50051:50051"  # gRPC
 
     environment:
       # All values loaded from .env file
@@ -34,13 +35,18 @@ services:
       - NLTK_DATA=/.cache/nltk_data
       - PRELOAD_MODEL=${PRELOAD_MODEL:-}
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-1000}
+      - ENABLE_GRPC=${ENABLE_GRPC:-true}
+      - REST_PORT=${REST_PORT:-9000}
+      - GRPC_PORT=${GRPC_PORT:-50051}
 
     volumes:
       # Persistent cache for models (recommended)
       - whisperx-cache:/.cache
 
-      # Mount local app directory for live code changes during development
+      # Mount local directories for live code changes during development
       - ./app:/workspace/app
+      - ./proto:/workspace/proto
+      - ./scripts:/workspace/scripts
 
     healthcheck:
       test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:9000/health')"]
