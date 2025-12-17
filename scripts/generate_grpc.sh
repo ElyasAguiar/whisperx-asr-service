@@ -26,6 +26,10 @@ python3 -m grpc_tools.protoc \
 # Create __init__.py to make it a package
 touch "$OUTPUT_DIR/__init__.py"
 
+# Fix imports in generated files to use relative imports
+echo "Fixing imports in generated files..."
+sed -i 's/^import asr_pb2/from . import asr_pb2/g' "$OUTPUT_DIR/asr_pb2_grpc.py"
+
 echo "✓ gRPC code generation complete!"
 echo "Generated files in: $OUTPUT_DIR"
 ls -la "$OUTPUT_DIR"
