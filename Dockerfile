@@ -72,6 +72,9 @@ RUN chmod +x /workspace/scripts/generate_grpc.sh && \
 # Expose API ports (REST and gRPC)
 EXPOSE 9000 50051
 
+# Set Python path to include workspace
+ENV PYTHONPATH=/workspace:$PYTHONPATH
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:9000/health')" || exit 1

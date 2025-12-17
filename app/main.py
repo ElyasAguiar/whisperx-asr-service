@@ -3,29 +3,28 @@ WhisperX ASR API Service
 Compatible with openai-whisper-asr-webservice API endpoints
 """
 
+import gc
+import logging
+import math
 import os
 import tempfile
-import logging
 import warnings
-import gc
-import math
-import numpy as np
-from typing import Optional, List
 from pathlib import Path
+from typing import List, Optional
 
-from fastapi import FastAPI, File, UploadFile, Form, Query, HTTPException
-from fastapi.responses import JSONResponse
-import whisperx
-from whisperx.diarize import DiarizationPipeline
+import numpy as np
 import torch
+import whisperx
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse
+from whisperx.diarize import DiarizationPipeline
 
 # Suppress pyannote pooling warnings about degrees of freedom
 warnings.filterwarnings("ignore", message=".*degrees of freedom is <= 0.*")
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="WhisperX ASR API",
     description="Automatic Speech Recognition API with Speaker Diarization using WhisperX",
-    version="0.1.1alpha"
+    version="0.1.1alpha",
 )
 
 # Configuration from environment variables
@@ -75,13 +74,15 @@ def load_whisper_model(model_name: str):
                 model_name,
                 device=DEVICE,
                 compute_type=COMPUTE_TYPE,
-                download_root=CACHE_DIR
+                download_root=CACHE_DIR,
             )
             loaded_models[model_name] = model
             logger.info(f"Model {model_name} loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load model {model_name}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to load model: {str(e)}"
+            )
 
     return loaded_models[model_name]
 
@@ -134,7 +135,7 @@ async def root():
         "status": "running",
         "service": "WhisperX ASR API",
         "device": DEVICE,
-        "compute_type": COMPUTE_TYPE
+        "compute_type": COMPUTE_TYPE,
     }
 
 
@@ -151,9 +152,11 @@ async def transcribe_audio(
     num_speakers: Optional[int] = Form(None),
     min_speakers: Optional[int] = Query(None),  # Accept from query params
     max_speakers: Optional[int] = Query(None),  # Accept from query params
-    diarize: Optional[bool] = Query(None),  # Enable speaker diarization (compatible with whisper-asr-webservice)
+    diarize: Optional[bool] = Query(
+        None
+    ),  # Enable speaker diarization (compatible with whisper-asr-webservice)
     enable_diarization: Optional[bool] = Query(None),  # Alias for diarize (deprecated)
-    return_speaker_embeddings: Optional[bool] = Query(None)  # Accept from query params
+    return_speaker_embeddings: Optional[bool] = Query(None),  # Accept from query params
 ):
     """
     Main ASR endpoint compatible with openai-whisper-asr-webservice
@@ -190,7 +193,9 @@ async def transcribe_audio(
             return_speaker_embeddings = False
 
         # Save uploaded file to temporary location
-        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(audio_file.filename).suffix) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=Path(audio_file.filename).suffix
+        ) as temp_file:
             temp_audio_path = temp_file.name
             content = await audio_file.read()
             temp_file.write(content)
@@ -201,13 +206,17 @@ async def transcribe_audio(
             raise HTTPException(
                 status_code=413,
                 detail=f"File too large ({file_size_mb:.1f}MB). Maximum allowed: {MAX_FILE_SIZE_MB}MB. "
-                       f"Large files may cause out-of-memory errors."
+                f"Large files may cause out-of-memory errors.",
             )
 
         if file_size_mb > 100:
-            logger.warning(f"Processing large file ({file_size_mb:.1f}MB) - may consume significant VRAM")
+            logger.warning(
+                f"Processing large file ({file_size_mb:.1f}MB) - may consume significant VRAM"
+            )
 
-        logger.info(f"Processing audio file: {audio_file.filename} ({file_size_mb:.1f}MB), model: {model}, language: {language}")
+        logger.info(
+            f"Processing audio file: {audio_file.filename} ({file_size_mb:.1f}MB), model: {model}, language: {language}"
+        )
 
         # Load model
         whisper_model = load_whisper_model(model)
@@ -219,7 +228,7 @@ async def transcribe_audio(
         transcribe_options = {
             "batch_size": BATCH_SIZE,
             "language": language,
-            "task": task
+            "task": task,
         }
 
         if initial_prompt:
@@ -238,9 +247,7 @@ async def transcribe_audio(
             logger.info("Aligning timestamps...")
             try:
                 model_a, metadata = whisperx.load_align_model(
-                    language_code=detected_language,
-                    device=DEVICE,
-                    model_dir=CACHE_DIR
+                    language_code=detected_language, device=DEVICE, model_dir=CACHE_DIR
                 )
                 result = whisperx.align(
                     result["segments"],
@@ -248,7 +255,7 @@ async def transcribe_audio(
                     metadata,
                     audio,
                     DEVICE,
-                    return_char_alignments=False
+                    return_char_alignments=False,
                 )
                 logger.info("Timestamp alignment complete")
 
@@ -256,7 +263,9 @@ async def transcribe_audio(
                 del model_a
                 clear_gpu_memory()
             except Exception as e:
-                logger.warning(f"Timestamp alignment failed: {str(e)}, continuing without word-level timestamps")
+                logger.warning(
+                    f"Timestamp alignment failed: {str(e)}, continuing without word-level timestamps"
+                )
 
         # Step 3: Speaker diarization (if enabled and HF token available)
         speaker_embeddings = None
@@ -267,7 +276,7 @@ async def transcribe_audio(
                 diarize_model = DiarizationPipeline(
                     model_name="pyannote/speaker-diarization-community-1",
                     use_auth_token=HF_TOKEN,
-                    device=torch.device(DEVICE)
+                    device=torch.device(DEVICE),
                 )
 
                 # Prepare diarization parameters
@@ -282,7 +291,9 @@ async def transcribe_audio(
                         diarize_params["min_speakers"] = min_speakers
                     if max_speakers is not None:
                         diarize_params["max_speakers"] = max_speakers
-                    logger.info(f"Diarization with speaker range: {min_speakers}-{max_speakers}")
+                    logger.info(
+                        f"Diarization with speaker range: {min_speakers}-{max_speakers}"
+                    )
 
                 # Add return_embeddings parameter if requested
                 if return_speaker_embeddings:
@@ -295,15 +306,19 @@ async def transcribe_audio(
                 # Check if embeddings were returned
                 if return_speaker_embeddings and isinstance(diarize_output, tuple):
                     diarize_segments, speaker_embeddings = diarize_output
-                    logger.info(f"Received speaker embeddings for {len(speaker_embeddings)} speakers")
+                    logger.info(
+                        f"Received speaker embeddings for {len(speaker_embeddings)} speakers"
+                    )
                 else:
                     diarize_segments = diarize_output
 
                 # Try to access exclusive_speaker_diarization (new in community-1)
                 # This simplifies reconciliation with transcription timestamps
-                if hasattr(diarize_segments, 'exclusive_speaker_diarization'):
+                if hasattr(diarize_segments, "exclusive_speaker_diarization"):
                     diarize_segments = diarize_segments.exclusive_speaker_diarization
-                    logger.info("Using exclusive speaker diarization for better timestamp reconciliation")
+                    logger.info(
+                        "Using exclusive speaker diarization for better timestamp reconciliation"
+                    )
 
                 # Assign speakers to words
                 result = whisperx.assign_word_speakers(diarize_segments, result)
@@ -313,7 +328,9 @@ async def transcribe_audio(
                 del diarize_model
                 clear_gpu_memory()
             except Exception as e:
-                logger.warning(f"Speaker diarization failed: {str(e)}, continuing without diarization")
+                logger.warning(
+                    f"Speaker diarization failed: {str(e)}, continuing without diarization"
+                )
         elif should_diarize and not HF_TOKEN:
             logger.warning("Speaker diarization requested but HF_TOKEN not set")
 
@@ -323,14 +340,18 @@ async def transcribe_audio(
                 "text": result.get("segments", []),
                 "language": detected_language,
                 "segments": result.get("segments", []),
-                "word_segments": result.get("word_segments", [])
+                "word_segments": result.get("word_segments", []),
             }
 
             # Add speaker embeddings if they were requested and available
             if return_speaker_embeddings and speaker_embeddings:
                 # Sanitize embeddings to ensure JSON compliance (remove NaN/Inf values)
-                response_data["speaker_embeddings"] = sanitize_float_values(speaker_embeddings)
-                logger.info(f"Including speaker embeddings in response: {list(speaker_embeddings.keys())}")
+                response_data["speaker_embeddings"] = sanitize_float_values(
+                    speaker_embeddings
+                )
+                logger.info(
+                    f"Including speaker embeddings in response: {list(speaker_embeddings.keys())}"
+                )
 
             return JSONResponse(content=response_data)
 
@@ -356,8 +377,8 @@ async def transcribe_audio(
         elif output_format == "vtt":
             vtt_content = ["WEBVTT\n"]
             for segment in result.get("segments", []):
-                start_time = format_timestamp(segment.get("start", 0)).replace(',', '.')
-                end_time = format_timestamp(segment.get("end", 0)).replace(',', '.')
+                start_time = format_timestamp(segment.get("start", 0)).replace(",", ".")
+                end_time = format_timestamp(segment.get("end", 0)).replace(",", ".")
                 text = segment.get("text", "").strip()
                 speaker = segment.get("speaker", "")
 
@@ -380,7 +401,9 @@ async def transcribe_audio(
             return {"tsv": "\n".join(tsv_content)}
 
         else:
-            raise HTTPException(status_code=400, detail=f"Unsupported output format: {output_format}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported output format: {output_format}"
+            )
 
     except Exception as e:
         logger.error(f"Transcription error: {str(e)}", exc_info=True)
@@ -401,10 +424,11 @@ async def health_check():
     return {
         "status": "healthy",
         "device": DEVICE,
-        "loaded_models": list(loaded_models.keys())
+        "loaded_models": list(loaded_models.keys()),
     }
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=9000)
