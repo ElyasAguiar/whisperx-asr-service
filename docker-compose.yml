@@ -1,7 +1,7 @@
 services:
   whisperx-asr:
     # Use prebuilt image from Docker Hub
-    image: learnedmachine/whisperx-asr-service:latest
+    image: elyasaguiar98/whisperx-asr-service:latest
 
     container_name: whisperx-asr-api
     restart: unless-stopped
