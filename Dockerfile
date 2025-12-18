@@ -9,6 +9,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Set working directory
 WORKDIR /workspace
 
+# Copy application code
+COPY ./app /workspace/app
+COPY ./proto /workspace/proto
+COPY ./scripts /workspace/scripts
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3.10 \
@@ -59,11 +64,6 @@ ENV NLTK_DATA=/.cache/nltk_data
 
 # Create cache directory
 RUN mkdir -p /.cache && chmod 777 /.cache
-
-# Copy application code
-COPY app /workspace/app
-COPY proto /workspace/proto
-COPY scripts /workspace/scripts
 
 # Generate gRPC code from proto files
 RUN chmod +x /workspace/scripts/generate_grpc.sh && \
