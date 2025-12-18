@@ -44,9 +44,9 @@ services:
       - whisperx-cache:/.cache
 
       # Mount local directories for live code changes during development
-      - ./app:/workspace/app
-      - ./proto:/workspace/proto
-      - ./scripts:/workspace/scripts
+      # - ./app:/workspace/app
+      # - ./proto:/workspace/proto
+      # - ./scripts:/workspace/scripts
 
     healthcheck:
       test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:9000/health')"]
