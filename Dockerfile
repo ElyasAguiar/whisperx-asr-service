@@ -81,4 +81,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the multi-protocol server (REST + gRPC)
 RUN chmod +x /workspace/scripts/start_servers.sh
-CMD ["/bin/bash", "/workspace/scripts/start_servers.sh"]
+CMD ["/bin/bash", "-c", "python3 -m app.server & exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${REST_PORT:-9000}"]
