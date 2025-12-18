@@ -80,4 +80,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:9000/health')" || exit 1
 
 # Run the multi-protocol server (REST + gRPC)
-CMD ["python3", "-m", "app.server"]
+RUN chmod +x /workspace/scripts/start_servers.sh
+CMD ["/workspace/scripts/start_servers.sh"]
