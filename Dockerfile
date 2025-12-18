@@ -73,7 +73,7 @@ RUN chmod +x /workspace/scripts/generate_grpc.sh && \
 EXPOSE 9000 50051
 
 # Set Python path to include workspace
-ENV PYTHONPATH=/workspace:$PYTHONPATH
+# ENV PYTHONPATH=/workspace:$PYTHONPATH
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
