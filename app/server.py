@@ -6,7 +6,7 @@ import logging
 import os
 import signal
 import sys
-import threading
+import multiprocessing
 from typing import Optional
 
 import uvicorn
@@ -17,9 +17,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global server references for graceful shutdown
-grpc_server = None
-shutdown_event = threading.Event()
+# Global references for graceful shutdown
+grpc_process = None
 
 
 def run_rest_server(host: str = "0.0.0.0", port: int = 9000):
@@ -34,38 +33,42 @@ def run_rest_server(host: str = "0.0.0.0", port: int = 9000):
 
 
 def run_grpc_server(port: int = 50051):
-    """Run the gRPC server"""
-    global grpc_server
-
+    """Run the gRPC server in a separate process"""
     try:
-        from .grpc_server import serve_grpc
+        from app.grpc_server import serve_grpc
 
-        logger.info(f"Starting gRPC server on port {port}")
+        logger.info(f"gRPC server process starting on port {port}")
         grpc_server = serve_grpc(port=port)
 
-        # Wait for shutdown signal
-        shutdown_event.wait()
-
-        logger.info("Stopping gRPC server...")
-        grpc_server.stop(grace=5)
+        # Keep the server running
+        grpc_server.wait_for_termination()
 
     except Exception as e:
         logger.error(f"gRPC server error: {str(e)}", exc_info=True)
+        sys.exit(1)
 
 
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
     logger.info(f"Received signal {signum}, initiating graceful shutdown...")
-    shutdown_event.set()
 
-    if grpc_server:
-        grpc_server.stop(grace=5)
+    if grpc_process and grpc_process.is_alive():
+        logger.info("Terminating gRPC server process...")
+        grpc_process.terminate()
+        grpc_process.join(timeout=5)
+        if grpc_process.is_alive():
+            logger.warning("Force killing gRPC process...")
+            grpc_process.kill()
 
     sys.exit(0)
 
 
 def main():
     """Main entry point - starts both REST and gRPC servers"""
+    global grpc_process
+
+    # Set multiprocessing start method (important for CUDA)
+    multiprocessing.set_start_method("spawn", force=True)
 
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
@@ -86,25 +89,31 @@ def main():
     logger.info("=" * 60)
 
     if enable_grpc:
-        # Start gRPC server in a separate thread
-        grpc_thread = threading.Thread(
-            target=run_grpc_server, args=(grpc_port,), daemon=True
+        # Start gRPC server in a separate process
+        grpc_process = multiprocessing.Process(
+            target=run_grpc_server, args=(grpc_port,), name="gRPC-Server"
         )
-        grpc_thread.start()
-        logger.info("gRPC server thread started")
+        grpc_process.start()
+        logger.info(f"gRPC server process started (PID: {grpc_process.pid})")
     else:
         logger.info("gRPC server disabled by configuration")
 
-    # Run REST server in main thread (blocks until shutdown)
+    # Run REST server in main process (blocks until shutdown)
     try:
         run_rest_server(port=rest_port)
     except KeyboardInterrupt:
         logger.info("Received interrupt, shutting down...")
-        shutdown_event.set()
     except Exception as e:
         logger.error(f"Server error: {str(e)}", exc_info=True)
-        shutdown_event.set()
         raise
+    finally:
+        # Cleanup gRPC process on exit
+        if grpc_process and grpc_process.is_alive():
+            logger.info("Stopping gRPC server process...")
+            grpc_process.terminate()
+            grpc_process.join(timeout=5)
+            if grpc_process.is_alive():
+                grpc_process.kill()
 
 
 if __name__ == "__main__":
