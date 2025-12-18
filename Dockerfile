@@ -81,4 +81,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the multi-protocol server (REST + gRPC)
 RUN chmod +x /workspace/scripts/start_servers.sh
-CMD ["/workspace/scripts/start_servers.sh"]
+CMD ["/bin/bash", "/workspace/scripts/start_servers.sh"]
