@@ -3,10 +3,10 @@ Main server entry point - runs both REST and gRPC servers
 """
 
 import logging
+import multiprocessing
 import os
 import signal
 import sys
-import multiprocessing
 from typing import Optional
 
 import uvicorn

@@ -15,8 +15,7 @@ import torch
 import whisperx
 from whisperx.diarize import DiarizationPipeline
 
-from .asr_interface import (ASRConfig, ASRInterface, ASRResult, Segment,
-                            WordInfo)
+from .asr_interface import ASRConfig, ASRInterface, ASRResult, Segment, WordInfo
 
 # Suppress pyannote warnings
 warnings.filterwarnings("ignore", message=".*degrees of freedom is <= 0.*")

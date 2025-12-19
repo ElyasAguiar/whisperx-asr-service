@@ -29,8 +29,13 @@ class TestGRPCStructure(unittest.TestCase):
     def test_import_asr_interface(self):
         """Test that ASR interface can be imported"""
         try:
-            from app.asr_interface import (ASRConfig, ASRInterface, ASRResult,
-                                           Segment, WordInfo)
+            from app.asr_interface import (
+                ASRConfig,
+                ASRInterface,
+                ASRResult,
+                Segment,
+                WordInfo,
+            )
 
             self.assertIsNotNone(ASRInterface)
             self.assertIsNotNone(ASRConfig)
