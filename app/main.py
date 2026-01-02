@@ -270,11 +270,11 @@ async def transcribe_audio(
         # Step 3: Speaker diarization (if enabled and HF token available)
         speaker_embeddings = None
         if should_diarize and HF_TOKEN:
-            logger.info("Starting speaker diarization with pyannote community-1...")
+            logger.info(f"Starting speaker diarization with pyannote speaker-diarization-3.1... {HF_TOKEN}")
             try:
                 # Load WhisperX diarization pipeline
                 diarize_model = DiarizationPipeline(
-                    model_name="pyannote/speaker-diarization-community-1",
+                    model_name="pyannote/speaker-diarization-3.1",
                     use_auth_token=HF_TOKEN,
                     device=torch.device(DEVICE),
                 )
