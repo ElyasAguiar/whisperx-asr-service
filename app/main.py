@@ -17,7 +17,7 @@ import torch
 import whisperx
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
-from whisperx.diarize import DiarizationPipeline
+from pyannote.audio import Pipeline
 
 # Suppress pyannote pooling warnings about degrees of freedom
 warnings.filterwarnings("ignore", message=".*degrees of freedom is <= 0.*")
@@ -270,14 +270,14 @@ async def transcribe_audio(
         # Step 3: Speaker diarization (if enabled and HF token available)
         speaker_embeddings = None
         if should_diarize and HF_TOKEN:
-            logger.info(f"Starting speaker diarization with pyannote speaker-diarization-3.1... {HF_TOKEN}")
+            logger.info("Starting speaker diarization with pyannote speaker-diarization-3.1...")
             try:
-                # Load WhisperX diarization pipeline
-                diarize_model = DiarizationPipeline(
-                    model_name="pyannote/speaker-diarization-3.1",
-                    use_auth_token=HF_TOKEN,
-                    device=torch.device(DEVICE),
+                # Load pyannote diarization pipeline directly
+                diarize_model = Pipeline.from_pretrained(
+                    "pyannote/speaker-diarization-3.1",
+                    token=HF_TOKEN,
                 )
+                diarize_model.to(torch.device(DEVICE))
 
                 # Prepare diarization parameters
                 diarize_params = {}
