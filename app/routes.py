@@ -51,16 +51,16 @@ async def transcribe_audio(
     initial_prompt: Optional[str] = Form(None),
     word_timestamps: bool = Form(True),
     output_format: str = Form("json"),
-    output: Optional[str] = Query(None),  # Legacy parameter name compatibility
+    output: Optional[str] = Form(None),  # Legacy parameter name compatibility
     model: str = Form(config.DEFAULT_MODEL),
     num_speakers: Optional[int] = Form(None),
-    min_speakers: Optional[int] = Query(None),  # Accept from query params
-    max_speakers: Optional[int] = Query(None),  # Accept from query params
-    diarize: Optional[bool] = Query(
+    min_speakers: Optional[int] = Form(None),
+    max_speakers: Optional[int] = Form(None),
+    diarize: Optional[bool] = Form(
         None
     ),  # Enable speaker diarization (compatible with whisper-asr-webservice)
-    enable_diarization: Optional[bool] = Query(None),  # Alias for diarize (deprecated)
-    return_speaker_embeddings: Optional[bool] = Query(None),  # Accept from query params
+    enable_diarization: Optional[bool] = Form(None),  # Alias for diarize (deprecated)
+    return_speaker_embeddings: Optional[bool] = Form(None),
 ):
     """
     Main ASR endpoint compatible with openai-whisper-asr-webservice
@@ -230,7 +230,17 @@ async def transcribe_audio(
 
                 # Assign speakers to words
                 result = whisperx.assign_word_speakers(diarize_segments, result)
-                logger.info("Speaker diarization complete")
+                
+                # Log speakers detected in segments for debugging
+                unique_speakers = set()
+                for segment in result.get("segments", []):
+                    if "speaker" in segment:
+                        unique_speakers.add(segment["speaker"])
+                
+                if unique_speakers:
+                    logger.info(f"Speaker diarization complete: {len(unique_speakers)} unique speakers detected: {sorted(unique_speakers)}")
+                else:
+                    logger.warning("Speaker diarization completed but no speakers were assigned to segments")
 
                 # Clear GPU memory after diarization
                 del diarize_model
@@ -244,11 +254,12 @@ async def transcribe_audio(
 
         # Format output based on requested format
         if output_format == "json":
+            # Sanitize all data structures to ensure JSON compliance (remove NaN/Inf values)
             response_data = {
-                "text": result.get("segments", []),
+                "text": sanitize_float_values(result.get("segments", [])),
                 "language": detected_language,
-                "segments": result.get("segments", []),
-                "word_segments": result.get("word_segments", []),
+                "segments": sanitize_float_values(result.get("segments", [])),
+                "word_segments": sanitize_float_values(result.get("word_segments", [])),
             }
 
             # Add speaker embeddings if they were requested and available
