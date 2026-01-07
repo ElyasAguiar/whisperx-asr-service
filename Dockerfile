@@ -9,6 +9,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Set working directory
 WORKDIR /workspace
 
+# Copy requirements first for better layer caching
+COPY requirements.txt /workspace/requirements.txt
+
 # Copy application code
 COPY ./app /workspace/app
 COPY ./proto /workspace/proto
@@ -28,22 +31,9 @@ RUN apt-get update && apt-get install -y \
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 ENV NLTK_DATA=/.cache/nltk_data
 
-# Install all Python dependencies in a single layer to reduce image size
+# Install all Python dependencies from requirements.txt
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir \
-        torch==2.3.0 \
-        torchaudio==2.3.0 \
-        --index-url https://download.pytorch.org/whl/cu121 && \
-    pip3 install --no-cache-dir \
-        whisperx \
-        pyannote.audio \
-        fastapi==0.104.1 \
-        uvicorn[standard]==0.24.0 \
-        python-multipart==0.0.6 \
-        pydantic==2.5.0 \
-        grpcio==1.76.0 \
-        grpcio-tools==1.76.0 \
-        protobuf==6.33.2 && \
+    pip3 install --no-cache-dir -r requirements.txt && \
     python3 -c "import nltk; nltk.download('punkt_tab', download_dir='/.cache/nltk_data')"
 
 # Create cache directory
