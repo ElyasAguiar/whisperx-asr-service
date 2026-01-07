@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN python3 -m pip install --no-cache-dir --upgrade pip
 
-# Install PyTorch with CUDA support (includes bundled cuDNN 9.8)
+# Install PyTorch with CUDA 12.1 support
 RUN pip3 install --no-cache-dir \
     torch==2.3.0 \
     torchaudio==2.3.0 \
@@ -36,16 +36,10 @@ RUN pip3 install --no-cache-dir \
 # Set library path to prefer PyTorch's bundled cuDNN over system cuDNN
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 
-# Install WhisperX from sealambda's pyannote-audio-4 compatible branch
-# Credit: https://github.com/sealambda/whisperX/tree/feat/pyannote-audio-4
-RUN pip3 install --no-cache-dir git+https://github.com/sealambda/whisperX.git@feat/pyannote-audio-4
+# Install WhisperX from PyPI (stable release)
+RUN pip3 install --no-cache-dir whisperx
 
-# Patch WhisperX diarize.py to use 'token=' instead of 'use_token=' for pyannote.audio 4.0
-# This handles both single-line and multi-line formatting
-RUN sed -i 's/use_token=/token=/g' \
-    /usr/local/lib/python3.10/dist-packages/whisperx/diarize.py
-
-# Install latest pyannote.audio for community-1 model support
+# Install/upgrade pyannote.audio for speaker diarization
 RUN pip3 install --no-cache-dir --upgrade pyannote.audio
 
 # Install API dependencies
