@@ -32,10 +32,11 @@ RUN apt-get update && apt-get install -y \
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 ENV NLTK_DATA=/.cache/nltk_data
 
-# Install all Python dependencies
-# Use --break-system-packages for Ubuntu 24.04 (PEP 668)
-RUN python3 -m pip install --no-cache-dir --upgrade pip --break-system-packages && \
-    pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+# Install all Python dependencies using virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Create cache directory
 RUN mkdir -p /.cache && chmod 777 /.cache
