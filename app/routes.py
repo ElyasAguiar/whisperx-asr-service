@@ -3,24 +3,16 @@ Route handlers for WhisperX ASR Service
 """
 
 import logging
-import os
-import tempfile
-import warnings
-from pathlib import Path
 from typing import Optional
 
-import torch
-import whisperx
-from fastapi import File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import JSONResponse
-from pyannote.audio import Pipeline
+from fastapi import File, Form, HTTPException, UploadFile
 
 from .config import config
-from .models import clear_gpu_memory, get_loaded_models, load_whisper_model
-from .utils import format_timestamp, sanitize_float_values
-
-# Suppress pyannote pooling warnings about degrees of freedom
-warnings.filterwarnings("ignore", message=".*degrees of freedom is <= 0.*")
+from .context_managers import TemporaryAudioFile
+from .formatters import JSONFormatter, SubtitleFormatter, TextFormatter
+from .models import get_loaded_models
+from .pipelines import ASRPipeline
+from .services import AudioService
 
 logger = logging.getLogger(__name__)
 
@@ -80,258 +72,75 @@ async def transcribe_audio(
         enable_diarization: Alias for diarize (deprecated, use diarize instead)
         return_speaker_embeddings: Return speaker embeddings (256-dimensional vectors)
     """
-    temp_audio_path = None
-
     try:
-        # Handle legacy parameter names and query param defaults
+        # Handle legacy parameter names
         if output is not None:
             output_format = output  # Support legacy 'output' parameter
 
-        # Set defaults for query parameters (since Query(None) allows None)
         # Handle diarize/enable_diarization: use either param, default to True if neither specified
         if diarize is not None or enable_diarization is not None:
             should_diarize = (diarize is True) or (enable_diarization is True)
         else:
             should_diarize = True  # Default to enabled
+
         if return_speaker_embeddings is None:
             return_speaker_embeddings = False
 
-        # Save uploaded file to temporary location
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=Path(audio_file.filename).suffix
-        ) as temp_file:
-            temp_audio_path = temp_file.name
+        # Use context manager for temporary audio file (automatic cleanup)
+        async with TemporaryAudioFile(audio_file) as audio_path:
+            # Validate file size
             content = await audio_file.read()
-            temp_file.write(content)
-
-        # Check file size
-        file_size_mb = len(content) / (1024 * 1024)
-        if file_size_mb > config.MAX_FILE_SIZE_MB:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File too large ({file_size_mb:.1f}MB). Maximum allowed: {config.MAX_FILE_SIZE_MB}MB. "
-                f"Large files may cause out-of-memory errors.",
+            await audio_file.seek(0)  # Reset for potential re-reads
+            file_size_mb = await AudioService.validate_file_size(
+                content, audio_file.filename
             )
 
-        if file_size_mb > 100:
-            logger.warning(
-                f"Processing large file ({file_size_mb:.1f}MB) - may consume significant VRAM"
-            )
-
-        logger.info(
-            f"Processing audio file: {audio_file.filename} ({file_size_mb:.1f}MB), model: {model}, language: {language}"
-        )
-
-        # Load model
-        whisper_model = load_whisper_model(model)
-
-        # Step 1: Transcribe with WhisperX
-        logger.info("Starting transcription...")
-        audio = whisperx.load_audio(temp_audio_path)
-
-        transcribe_options = {
-            "batch_size": config.BATCH_SIZE,
-            "language": language,
-            "task": task,
-        }
-
-        if initial_prompt:
-            transcribe_options["initial_prompt"] = initial_prompt
-
-        result = whisper_model.transcribe(audio, **transcribe_options)
-
-        detected_language = result.get("language", language or "en")
-        logger.info(f"Transcription complete. Detected language: {detected_language}")
-
-        # Clear GPU memory after transcription
-        clear_gpu_memory()
-
-        # Step 2: Align whisper output with word-level timestamps
-        if word_timestamps:
-            logger.info("Aligning timestamps...")
-            try:
-                model_a, metadata = whisperx.load_align_model(
-                    language_code=detected_language,
-                    device=config.DEVICE,
-                    model_dir=config.CACHE_DIR,
-                )
-                result = whisperx.align(
-                    result["segments"],
-                    model_a,
-                    metadata,
-                    audio,
-                    config.DEVICE,
-                    return_char_alignments=False,
-                )
-                logger.info("Timestamp alignment complete")
-
-                # Clear GPU memory after alignment
-                del model_a
-                clear_gpu_memory()
-            except Exception as e:
-                logger.warning(
-                    f"Timestamp alignment failed: {str(e)}, continuing without word-level timestamps"
-                )
-
-        # Step 3: Speaker diarization (if enabled and HF token available)
-        speaker_embeddings = None
-        if should_diarize and config.HF_TOKEN:
             logger.info(
-                "Starting speaker diarization with pyannote speaker-diarization-3.1..."
-            )
-            try:
-                # Load pyannote diarization pipeline directly
-                diarize_model = Pipeline.from_pretrained(
-                    "pyannote/speaker-diarization-3.1",
-                    token=config.HF_TOKEN,
-                )
-                diarize_model.to(torch.device(config.DEVICE))
-
-                # Prepare diarization parameters
-                diarize_params = {}
-                if num_speakers is not None:
-                    # If exact number is provided, use it (overrides min/max)
-                    diarize_params["num_speakers"] = num_speakers
-                    logger.info(f"Diarization with exact speaker count: {num_speakers}")
-                else:
-                    # Otherwise use min/max range
-                    if min_speakers is not None:
-                        diarize_params["min_speakers"] = min_speakers
-                    if max_speakers is not None:
-                        diarize_params["max_speakers"] = max_speakers
-                    logger.info(
-                        f"Diarization with speaker range: {min_speakers}-{max_speakers}"
-                    )
-
-                # Add return_embeddings parameter if requested
-                if return_speaker_embeddings:
-                    diarize_params["return_embeddings"] = True
-                    logger.info("Speaker embeddings will be returned")
-
-                # Run diarization
-                diarize_output = diarize_model(audio, **diarize_params)
-
-                # Check if embeddings were returned
-                if return_speaker_embeddings and isinstance(diarize_output, tuple):
-                    diarize_segments, speaker_embeddings = diarize_output
-                    logger.info(
-                        f"Received speaker embeddings for {len(speaker_embeddings)} speakers"
-                    )
-                else:
-                    diarize_segments = diarize_output
-
-                # Try to access exclusive_speaker_diarization (new in community-1)
-                # This simplifies reconciliation with transcription timestamps
-                if hasattr(diarize_segments, "exclusive_speaker_diarization"):
-                    diarize_segments = diarize_segments.exclusive_speaker_diarization
-                    logger.info(
-                        "Using exclusive speaker diarization for better timestamp reconciliation"
-                    )
-
-                # Assign speakers to words
-                result = whisperx.assign_word_speakers(diarize_segments, result)
-                
-                # Log speakers detected in segments for debugging
-                unique_speakers = set()
-                for segment in result.get("segments", []):
-                    if "speaker" in segment:
-                        unique_speakers.add(segment["speaker"])
-                
-                if unique_speakers:
-                    logger.info(f"Speaker diarization complete: {len(unique_speakers)} unique speakers detected: {sorted(unique_speakers)}")
-                else:
-                    logger.warning("Speaker diarization completed but no speakers were assigned to segments")
-
-                # Clear GPU memory after diarization
-                del diarize_model
-                clear_gpu_memory()
-            except Exception as e:
-                logger.warning(
-                    f"Speaker diarization failed: {str(e)}, continuing without diarization"
-                )
-        elif should_diarize and not config.HF_TOKEN:
-            logger.warning("Speaker diarization requested but HF_TOKEN not set")
-
-        # Format output based on requested format
-        if output_format == "json":
-            # Sanitize all data structures to ensure JSON compliance (remove NaN/Inf values)
-            response_data = {
-                "text": sanitize_float_values(result.get("segments", [])),
-                "language": detected_language,
-                "segments": sanitize_float_values(result.get("segments", [])),
-                "word_segments": sanitize_float_values(result.get("word_segments", [])),
-            }
-
-            # Add speaker embeddings if they were requested and available
-            if return_speaker_embeddings and speaker_embeddings:
-                # Sanitize embeddings to ensure JSON compliance (remove NaN/Inf values)
-                response_data["speaker_embeddings"] = sanitize_float_values(
-                    speaker_embeddings
-                )
-                logger.info(
-                    f"Including speaker embeddings in response: {list(speaker_embeddings.keys())}"
-                )
-
-            return JSONResponse(content=response_data)
-
-        elif output_format == "text":
-            text = " ".join([seg.get("text", "") for seg in result.get("segments", [])])
-            return {"text": text}
-
-        elif output_format == "srt":
-            srt_content = []
-            for i, segment in enumerate(result.get("segments", []), 1):
-                start_time = format_timestamp(segment.get("start", 0))
-                end_time = format_timestamp(segment.get("end", 0))
-                text = segment.get("text", "").strip()
-                speaker = segment.get("speaker", "")
-
-                if speaker:
-                    text = f"[{speaker}] {text}"
-
-                srt_content.append(f"{i}\n{start_time} --> {end_time}\n{text}\n")
-
-            return {"srt": "\n".join(srt_content)}
-
-        elif output_format == "vtt":
-            vtt_content = ["WEBVTT\n"]
-            for segment in result.get("segments", []):
-                start_time = format_timestamp(segment.get("start", 0)).replace(",", ".")
-                end_time = format_timestamp(segment.get("end", 0)).replace(",", ".")
-                text = segment.get("text", "").strip()
-                speaker = segment.get("speaker", "")
-
-                if speaker:
-                    text = f"[{speaker}] {text}"
-
-                vtt_content.append(f"{start_time} --> {end_time}\n{text}\n")
-
-            return {"vtt": "\n".join(vtt_content)}
-
-        elif output_format == "tsv":
-            tsv_content = ["start\tend\ttext\tspeaker"]
-            for segment in result.get("segments", []):
-                start = segment.get("start", 0)
-                end = segment.get("end", 0)
-                text = segment.get("text", "").strip()
-                speaker = segment.get("speaker", "")
-                tsv_content.append(f"{start}\t{end}\t{text}\t{speaker}")
-
-            return {"tsv": "\n".join(tsv_content)}
-
-        else:
-            raise HTTPException(
-                status_code=400, detail=f"Unsupported output format: {output_format}"
+                f"Processing audio: {audio_file.filename} ({file_size_mb:.1f}MB), "
+                f"model: {model}, language: {language}"
             )
 
+            # Initialize and run ASR pipeline
+            pipeline = ASRPipeline(
+                model=model,
+                enable_alignment=word_timestamps,
+                enable_diarization=should_diarize,
+                hf_token=config.HF_TOKEN,
+            )
+
+            result, detected_language, speaker_embeddings = await pipeline.process(
+                audio_path=audio_path,
+                language=language,
+                task=task,
+                initial_prompt=initial_prompt,
+                num_speakers=num_speakers,
+                min_speakers=min_speakers,
+                max_speakers=max_speakers,
+                return_speaker_embeddings=return_speaker_embeddings,
+            )
+
+            # Format output based on requested format
+            if output_format == "json":
+                return JSONFormatter.format(
+                    result, detected_language, speaker_embeddings
+                )
+            elif output_format == "text":
+                return TextFormatter.format_text(result)
+            elif output_format == "srt":
+                return SubtitleFormatter.format_srt(result)
+            elif output_format == "vtt":
+                return SubtitleFormatter.format_vtt(result)
+            elif output_format == "tsv":
+                return TextFormatter.format_tsv(result)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported output format: {output_format}",
+                )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Transcription error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-    finally:
-        # Clean up temporary file
-        if temp_audio_path and os.path.exists(temp_audio_path):
-            try:
-                os.unlink(temp_audio_path)
-            except Exception as e:
-                logger.warning(f"Failed to delete temporary file: {str(e)}")

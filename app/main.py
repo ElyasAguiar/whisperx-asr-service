@@ -10,7 +10,12 @@ from fastapi import FastAPI
 from . import __version__
 from .config import config
 from .models import preload_model
+from .patches import apply_patches
 from .routes import health_check, root, transcribe_audio
+
+# CRITICAL: Apply PyTorch compatibility patches BEFORE any imports of pyannote or whisperx
+# This must be done at module level before other imports that use these libraries
+apply_patches()
 
 # Configure logging
 logging.basicConfig(

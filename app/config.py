@@ -19,7 +19,9 @@ class Config:
 
     def __init__(self):
         # Device configuration
-        self.DEVICE = os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
+        self.DEVICE = os.getenv(
+            "DEVICE", "cuda" if torch.cuda.is_available() else "cpu"
+        )
         self.COMPUTE_TYPE = os.getenv(
             "COMPUTE_TYPE", "float16" if self.DEVICE == "cuda" else "int8"
         )
