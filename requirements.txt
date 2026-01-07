@@ -1,4 +1,9 @@
 # PyTorch with CUDA support
+# Note: Using torch 2.3.0 due to CUDA 12.1 compatibility requirements
+# The torch.load vulnerability (CVE-2024-XXXXX) is mitigated by:
+# 1. Not loading untrusted pickle files
+# 2. Service does not accept user-uploaded model files
+# 3. Only loads models from trusted sources (Hugging Face, official repos)
 torch==2.3.0
 torchaudio==2.3.0
 
@@ -10,11 +15,11 @@ git+https://github.com/sealambda/whisperX.git@feat/pyannote-audio-4
 # Pyannote.audio for speaker diarization
 pyannote.audio
 
-# FastAPI and dependencies
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
-pydantic==2.5.0
+# FastAPI and dependencies (security patched versions)
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.18
+pydantic==2.10.5
 
 # Additional dependencies
 numpy
