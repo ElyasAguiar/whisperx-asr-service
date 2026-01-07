@@ -3,6 +3,8 @@ torch==2.3.0
 torchaudio==2.3.0
 
 # WhisperX - Using pyannote-audio 4 compatible branch
+# This specific branch is required for compatibility with pyannote.audio 4.0
+# Source: https://github.com/sealambda/whisperX/tree/feat/pyannote-audio-4
 git+https://github.com/sealambda/whisperX.git@feat/pyannote-audio-4
 
 # Pyannote.audio for speaker diarization

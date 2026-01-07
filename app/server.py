@@ -1,5 +1,5 @@
 """
-Main server entry point - runs REST API server
+REST API server entry point for WhisperX ASR Service
 """
 
 import logging

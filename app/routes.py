@@ -52,7 +52,7 @@ async def transcribe_audio(
     word_timestamps: bool = Form(True),
     output_format: str = Form("json"),
     output: Optional[str] = Query(None),  # Legacy parameter name compatibility
-    model: str = Form(None),
+    model: str = Form(config.DEFAULT_MODEL),
     num_speakers: Optional[int] = Form(None),
     min_speakers: Optional[int] = Query(None),  # Accept from query params
     max_speakers: Optional[int] = Query(None),  # Accept from query params
@@ -83,10 +83,6 @@ async def transcribe_audio(
     temp_audio_path = None
 
     try:
-        # Use default model if not specified
-        if model is None:
-            model = config.DEFAULT_MODEL
-
         # Handle legacy parameter names and query param defaults
         if output is not None:
             output_format = output  # Support legacy 'output' parameter
