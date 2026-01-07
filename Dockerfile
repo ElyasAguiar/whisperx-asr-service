@@ -35,8 +35,7 @@ ENV NLTK_DATA=/.cache/nltk_data
 # 1. First install PyTorch with CUDA from special index
 # 2. Then install remaining dependencies (excluding torch/torchaudio from requirements)
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir -r requirements.txt && \
-    python3 -c "import nltk; nltk.download('punkt_tab', download_dir='/.cache/nltk_data')"
+    pip3 install --no-cache-dir -r requirements.txt
 
 # Create cache directory
 RUN mkdir -p /.cache && chmod 777 /.cache
