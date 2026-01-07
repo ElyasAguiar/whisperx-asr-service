@@ -1,7 +1,7 @@
 # WhisperX ASR API Service Dockerfile
 # Based on NVIDIA CUDA for GPU support
 
-FROM nvidia/cuda:12.3.2-cudnn9-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -31,7 +31,9 @@ RUN apt-get update && apt-get install -y \
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 ENV NLTK_DATA=/.cache/nltk_data
 
-# Install all Python dependencies from requirements.txt
+# Install all Python dependencies
+# 1. First install PyTorch with CUDA from special index
+# 2. Then install remaining dependencies (excluding torch/torchaudio from requirements)
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir -r requirements.txt && \
     python3 -c "import nltk; nltk.download('punkt_tab', download_dir='/.cache/nltk_data')"
