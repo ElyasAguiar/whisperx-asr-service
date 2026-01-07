@@ -9,11 +9,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Set working directory
 WORKDIR /workspace
 
-# Copy application code
-COPY ./app /workspace/app
-COPY ./proto /workspace/proto
-COPY ./scripts /workspace/scripts
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3.10 \
@@ -21,7 +16,6 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     ffmpeg \
     git \
-    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
@@ -41,22 +35,18 @@ ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local
 RUN pip3 install --no-cache-dir git+https://github.com/sealambda/whisperX.git@feat/pyannote-audio-4
 
 # Patch WhisperX diarize.py to use 'token=' instead of 'use_token=' for pyannote.audio 4.0
-# This handles both single-line and multi-line formatting
 RUN sed -i 's/use_token=/token=/g' \
     /usr/local/lib/python3.10/dist-packages/whisperx/diarize.py
 
 # Install latest pyannote.audio for community-1 model support
 RUN pip3 install --no-cache-dir --upgrade pyannote.audio
 
-# Install API dependencies
-RUN pip3 install --no-cache-dir \
-    fastapi==0.104.1 \
-    uvicorn[standard]==0.24.0 \
-    python-multipart==0.0.6 \
-    pydantic==2.5.0 \
-    grpcio==1.76.0 \
-    grpcio-tools==1.76.0 \
-    protobuf==6.33.2
+# Copy application code
+COPY ./app /workspace/app
+COPY requirements.txt /workspace/
+
+# Install API dependencies from requirements file
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Pre-download NLTK data for timestamp alignment (enables offline use)
 RUN python3 -c "import nltk; nltk.download('punkt_tab', download_dir='/.cache/nltk_data')"
@@ -65,19 +55,13 @@ ENV NLTK_DATA=/.cache/nltk_data
 # Create cache directory
 RUN mkdir -p /.cache && chmod 777 /.cache
 
-# Generate gRPC code from proto files
-RUN chmod +x /workspace/scripts/generate_grpc.sh && \
-    /workspace/scripts/generate_grpc.sh
-
-# Expose API ports (REST and gRPC)
-EXPOSE 9000 50051
-
-# Set Python path to include workspace
-# ENV PYTHONPATH=/workspace:$PYTHONPATH
+# Expose REST API port
+EXPOSE 9000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:9000/health')" || exit 1
 
-# Run the multi-protocol server (REST + gRPC)
+# Run the REST API server
 CMD ["python3", "-m", "app.server"]
+

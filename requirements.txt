@@ -1,0 +1,19 @@
+# PyTorch with CUDA support
+torch==2.3.0
+torchaudio==2.3.0
+
+# WhisperX - Using pyannote-audio 4 compatible branch
+git+https://github.com/sealambda/whisperX.git@feat/pyannote-audio-4
+
+# Pyannote.audio for speaker diarization
+pyannote.audio
+
+# FastAPI and dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.0
+
+# Additional dependencies
+numpy
+nltk
