@@ -1,11 +1,7 @@
-# PyTorch with CUDA support
-# Note: Using torch 2.3.0 due to CUDA 12.1 compatibility requirements
-# The torch.load vulnerability (CVE-2024-XXXXX) is mitigated by:
-# 1. Not loading untrusted pickle files
-# 2. Service does not accept user-uploaded model files
-# 3. Only loads models from trusted sources (Hugging Face, official repos)
-torch==2.3.0
-torchaudio==2.3.0
+# PyTorch with CUDA support (security patched version)
+# PyTorch 2.6.0 fixes CVE related to torch.load with weights_only=True
+torch==2.6.0
+torchaudio==2.6.0
 
 # WhisperX - Using pyannote-audio 4 compatible branch
 # This specific branch is required for compatibility with pyannote.audio 4.0
