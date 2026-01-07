@@ -62,12 +62,13 @@ class DiarizationService:
         logger.info(
             "Starting speaker diarization with pyannote speaker-diarization-3.1..."
         )
+        logger.info(f"HF_token: {self.hf_token[:4]}****")
 
         try:
             # Load pyannote diarization pipeline
             diarize_model = Pipeline.from_pretrained(
                 "pyannote/speaker-diarization-3.1",
-                token=self.hf_token,
+                use_auth_token=self.hf_token,
             )
             diarize_model.to(torch.device(config.DEVICE))
 
