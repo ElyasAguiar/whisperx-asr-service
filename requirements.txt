@@ -1,18 +1,15 @@
 # PyTorch with CUDA support (security patched version)
 # PyTorch 2.5.1 fixes CVE related to torch.load with weights_only=True
+--index-url https://download.pytorch.org/whl/cu121
 torch==2.5.1
 torchaudio==2.5.1
 
 # WhisperX - Using pyannote-audio 4 compatible branch
-# This specific branch is required for compatibility with pyannote.audio 4.0
-# Source: https://github.com/sealambda/whisperX/tree/feat/pyannote-audio-4
-git+https://github.com/sealambda/whisperX.git@feat/pyannote-audio-4
-
-# Pyannote.audio for speaker diarization
-pyannote.audio
+whisperx
 
 # FastAPI and dependencies (security patched versions)
-fastapi==0.115.6
+--index-url https://pypi.org/simple/
+fastapi
 uvicorn[standard]==0.34.0
 python-multipart==0.0.18
 pydantic==2.10.5
