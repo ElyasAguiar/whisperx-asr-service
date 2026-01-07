@@ -5,7 +5,6 @@ Compatible with NVIDIA Riva ASR protocol
 
 import io
 import logging
-import os
 import wave
 from concurrent import futures
 from typing import Iterator
@@ -13,6 +12,7 @@ from typing import Iterator
 import grpc
 
 from .asr_interface import ASRConfig, ASRInterface
+from .config import config as app_config
 from .grpc_generated import asr_pb2, asr_pb2_grpc
 from .whisperx_asr import WhisperXASR
 
@@ -151,7 +151,7 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
             logger.info(
                 f"Processing audio: {len(audio_bytes)} bytes, model: {config.model}, language: {config.language}"
             )
-            result = self.asr_engine.transcribe(audio_bytes, config)
+            result, _ = self.asr_engine.transcribe(audio_bytes, config)
             logger.info(f"Transcription complete: {len(result.segments)} segments")
 
             # Build response
@@ -259,7 +259,7 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
             )
 
             # Process audio
-            result = self.asr_engine.transcribe(audio_bytes, config)
+            result, _ = self.asr_engine.transcribe(audio_bytes, config)
             logger.info(
                 f"Streaming transcription complete: {len(result.segments)} segments"
             )
@@ -309,31 +309,21 @@ class AsrServiceServicer(asr_pb2_grpc.AsrServiceServicer):
 
 
 def serve_grpc(
-    port: int = 50051, asr_engine: ASRInterface = None, max_workers: int = 10
+    port: int = None, asr_engine: ASRInterface = None, max_workers: int = 10
 ):
     """
     Start the gRPC server
 
     Args:
-        port: Port to listen on
+        port: Port to listen on (defaults to app config)
         asr_engine: ASR engine to use (defaults to WhisperXASR)
         max_workers: Maximum number of worker threads
     """
+    port = port or app_config.grpc_port
+
     # Create ASR engine if not provided
     if asr_engine is None:
-        device = os.getenv("DEVICE", "cuda")
-        compute_type = os.getenv("COMPUTE_TYPE", "float16")
-        batch_size = int(os.getenv("BATCH_SIZE", "16"))
-        hf_token = os.getenv("HF_TOKEN", None)
-        cache_dir = os.getenv("CACHE_DIR", "/.cache")
-
-        asr_engine = WhisperXASR(
-            device=device,
-            compute_type=compute_type,
-            batch_size=batch_size,
-            hf_token=hf_token,
-            cache_dir=cache_dir,
-        )
+        asr_engine = WhisperXASR()
 
     # Create gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
@@ -357,8 +347,7 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    port = int(os.getenv("GRPC_PORT", "50051"))
-    server = serve_grpc(port=port)
+    server = serve_grpc()
 
     try:
         server.wait_for_termination()
