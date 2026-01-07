@@ -1,0 +1,17 @@
+# Core ASR
+whisperx
+pyannote.audio
+
+# API Framework
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+
+# gRPC
+grpcio
+grpcio-tools
+protobuf
+
+# Utils
+nltk

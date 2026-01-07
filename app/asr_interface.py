@@ -4,26 +4,32 @@ This makes the service agnostic to the underlying LLM/ASR implementation
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+from .config import config as app_config
 
 
 @dataclass
 class ASRConfig:
     """Configuration for ASR processing"""
 
+    # Transcription settings
     language: Optional[str] = None
     task: str = "transcribe"
-    model: str = "large-v3"
-    enable_diarization: bool = True
+    model: str = field(default_factory=lambda: app_config.default_model)
+    initial_prompt: Optional[str] = None
     enable_word_timestamps: bool = True
+    sample_rate: int = 16000
+    audio_encoding: str = "LINEAR_PCM"
+
+    # Diarization settings
+    enable_diarization: bool = True
+    diarization_model: str = field(default_factory=lambda: app_config.diarization_model)
     num_speakers: Optional[int] = None
     min_speakers: Optional[int] = None
     max_speakers: Optional[int] = None
-    initial_prompt: Optional[str] = None
-    sample_rate: int = 16000
-    audio_encoding: str = "LINEAR_PCM"
-    diarization_model: str = "pyannote/speaker-diarization-community-1"
+    return_speaker_embeddings: bool = False
 
 
 @dataclass
