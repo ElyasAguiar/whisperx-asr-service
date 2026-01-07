@@ -21,11 +21,11 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN python3 -m pip install --no-cache-dir --upgrade pip
 
-# Install PyTorch 2.6.0 with CUDA 12.1 support (security patched)
+# Install PyTorch 2.5.1 with CUDA 12.1 support (security patched)
 # Fixes CVE related to torch.load with weights_only=True
 RUN pip3 install --no-cache-dir \
-    torch==2.6.0 \
-    torchaudio==2.6.0 \
+    torch==2.5.1 \
+    torchaudio==2.5.1 \
     --index-url https://download.pytorch.org/whl/cu121
 
 # Set library path to prefer PyTorch's bundled cuDNN over system cuDNN
