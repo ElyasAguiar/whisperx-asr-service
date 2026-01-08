@@ -92,18 +92,11 @@ class DiarizationService:
                 diarize_params["return_embeddings"] = True
                 logger.info("Speaker embeddings will be returned")
 
-            # CRITICAL FIX: Convert audio to proper format for pyannote
-            # pyannote expects {"waveform": tensor, "sample_rate": int}
-            # whisperx.load_audio() returns numpy array
-            audio_input = {
-                "waveform": torch.from_numpy(audio).unsqueeze(0),
-                "sample_rate": 16000,
-            }
-
             # Run diarization with context manager for GPU cleanup
+            # whisperx DiarizationPipeline expects numpy array directly
             with GPUModelContext() as ctx:
                 ctx.register(diarize_model)
-                diarize_output = diarize_model(audio_input, **diarize_params)
+                diarize_output = diarize_model(audio, **diarize_params)
 
             # Check if embeddings were returned
             speaker_embeddings = None
