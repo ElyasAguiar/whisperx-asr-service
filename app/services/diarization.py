@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import torch
 import whisperx
-from pyannote.audio import Pipeline
+from whisperx.diarize import DiarizationPipeline
 
 from ..config import config
 from ..context_managers import GPUModelContext
@@ -65,12 +65,11 @@ class DiarizationService:
         logger.info(f"HF_token: {self.hf_token[:4]}****")
 
         try:
-            # Load pyannote diarization pipeline
-            diarize_model = Pipeline.from_pretrained(
-                config.DIARIZATION_MODEL,
-                token=self.hf_token,
+            # Load whisperx diarization pipeline
+            diarize_model = DiarizationPipeline(
+                use_auth_token=self.hf_token,
+                device=config.DEVICE,
             )
-            diarize_model.to(torch.device(config.DEVICE))
 
             # Prepare diarization parameters
             diarize_params = {}
