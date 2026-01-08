@@ -40,6 +40,10 @@ class Config:
         # File size limits
         self.MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "1000"))
 
+        self.DIARIZATION_MODEL = os.getenv(
+            "DIARIZATION_MODEL", "pyannote/speaker-diarization-3.1"
+        )
+
         # Log configuration
         logger.info(f"WhisperX ASR Service initialized on device: {self.DEVICE}")
         logger.info(f"Compute type: {self.COMPUTE_TYPE}, Batch size: {self.BATCH_SIZE}")

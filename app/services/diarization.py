@@ -67,7 +67,7 @@ class DiarizationService:
         try:
             # Load pyannote diarization pipeline
             diarize_model = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-community-1",
+                config.DIARIZATION_MODEL,
                 token=self.hf_token,
             )
             diarize_model.to(torch.device(config.DEVICE))
