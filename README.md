@@ -17,8 +17,6 @@ A simple ASR API service powered by WhisperX for transcription with speaker diar
 - Returns word-level timestamps
 - Supports 90+ languages
 - Outputs JSON, SRT, VTT, TSV formats
-- **NEW: gRPC API** compatible with NVIDIA Riva ASR protocol
-- **Model-agnostic architecture** for easy integration with different ASR models
 - Runs on your own GPU hardware via Docker
 
 ## Limitations
@@ -159,117 +157,6 @@ curl -X POST http://localhost:9000/asr \
 
 ---
 
-## 🆕 gRPC Support (NVIDIA Riva Compatible)
-
-This service now includes **gRPC API support**, making it compatible with NVIDIA Riva and other gRPC-based ASR clients.
-
-### Key Features
-
-- **NVIDIA Riva Protocol Compatible**: Drop-in replacement for Riva ASR
-- **Streaming & Batch Recognition**: Support for both real-time and file-based transcription
-- **Model-Agnostic Architecture**: Easy to integrate different ASR models
-- **Runs Alongside REST API**: Both protocols available simultaneously
-
-### Quick Start with gRPC
-
-The gRPC server is enabled by default on port **50051** when you start the service:
-
-```bash
-# Service exposes both:
-# - REST API on port 9000
-# - gRPC API on port 50051
-
-docker compose up -d
-```
-
-### Test gRPC API
-
-```bash
-# Install Python gRPC client
-pip install grpcio grpcio-tools
-
-# Run example client
-python3 examples/grpc_client_example.py /path/to/audio.wav \
-    --host localhost \
-    --port 50051 \
-    --language en \
-    --model large-v3
-```
-
-### Python Client Example
-
-```python
-import grpc
-from app.grpc_generated import asr_pb2, asr_pb2_grpc
-
-# Connect to gRPC server
-channel = grpc.insecure_channel('localhost:50051')
-stub = asr_pb2_grpc.AsrServiceStub(channel)
-
-# Read audio file
-with open('audio.wav', 'rb') as f:
-    audio_content = f.read()
-
-# Configure recognition
-config = asr_pb2.RecognitionConfig(
-    encoding=asr_pb2.RecognitionConfig.LINEAR_PCM,
-    sample_rate_hertz=16000,
-    language_code="en",
-    model="large-v3",
-    enable_word_time_offsets=True,
-    enable_speaker_diarization=True
-)
-
-# Send request
-request = asr_pb2.RecognizeRequest(
-    config=config,
-    audio=asr_pb2.RecognitionAudio(content=audio_content)
-)
-
-response = stub.Recognize(request)
-
-# Process results
-for result in response.results:
-    for alternative in result.alternatives:
-        print(f"Transcript: {alternative.transcript}")
-```
-
-### Configuration
-
-Configure gRPC in your `.env` file:
-
-```bash
-ENABLE_GRPC=true          # Enable/disable gRPC (default: true)
-GRPC_PORT=50051           # gRPC port (default: 50051)
-REST_PORT=9000            # REST port (default: 9000)
-```
-
-### Integration with NVIDIA Riva
-
-This service implements the same gRPC protocol as NVIDIA Riva ASR. To use it as a Riva replacement:
-
-```python
-# Old Riva client
-channel = grpc.insecure_channel('riva-server:50051')
-
-# New WhisperX client (same API!)
-channel = grpc.insecure_channel('whisperx-server:50051')
-```
-
-No code changes needed - the API is compatible!
-
-### Full Documentation
-
-For complete gRPC documentation including:
-- Streaming recognition
-- Advanced configuration
-- Multi-language clients (Go, Node.js)
-- Model-agnostic architecture details
-
-See **[GRPC_GUIDE.md](GRPC_GUIDE.md)** for the complete guide.
-
----
-
 ## Build from Source (Advanced)
 
 For development or if you want to build from source:
@@ -325,10 +212,7 @@ docker run -d \
 
 ## API Documentation
 
-The service provides two API protocols:
-
-- **REST API**: Visit http://localhost:9000/docs for interactive documentation
-- **gRPC API**: See [GRPC_GUIDE.md](GRPC_GUIDE.md) for complete gRPC documentation
+Visit http://localhost:9000/docs for interactive API documentation.
 
 ### REST API
 
