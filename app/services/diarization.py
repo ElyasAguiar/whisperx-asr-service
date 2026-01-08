@@ -60,7 +60,7 @@ class DiarizationService:
             raise ValueError("HF_TOKEN not configured for speaker diarization")
 
         logger.info(
-            "Starting speaker diarization with pyannote speaker-diarization-3.1..."
+            f"Starting speaker diarization with pyannote {config.DIARIZATION_MODEL}..."
         )
         logger.info(f"HF_token: {self.hf_token[:4]}****")
 
